@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Web Remote</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link href="style.css" rel="stylesheet" type="text/css" media="all"/>
+  <script type="text/javascript" src="jquery-1.8.3.min.js"></script>
+  <script type="text/javascript" src="jquery.json-2.4.min.js"></script>
+  <script type="text/javascript">
+  	function ShowHide(divId)
+	  {
+	  	if(document.getElementById(divId).style.display == 'none')
+		{
+		  document.getElementById(divId).style.display = 'block';
+		}
+	  	else
+	  	{
+	  	  document.getElementById(divId).style.display = 'none';
+	  	}
+	  }
+
+	function getXmlHttp(){
+	  var xmlhttp;
+	  try {
+	    xmlhttp = new ActiveXObject("Msxml2.XMLHTTP");
+	  } catch (e) {
+	    try {
+	      xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+	    } catch (E) {
+	      xmlhttp = false;
+	    }
+	  }
+	  if (!xmlhttp && typeof XMLHttpRequest!='undefined') {
+	    xmlhttp = new XMLHttpRequest();
+	  }
+	  return xmlhttp;
+	}
+
+	function login() {
+		var statusElem = document.getElementById('status');
+		var statusCommentElem = document.getElementById('status-comment'); 
+		var usrname = encodeURI(document.getElementById('name').value);
+		var psw = encodeURI(document.getElementById('password').value);
+		var p = {
+			username: usrname,
+			passwd: psw
+		}
+		$.ajax({
+            url: "/webman/login.cgi",
+            type: "GET",
+            data: p,
+            dataType: "text",
+            complete: function (jqXHR, textStatus) {
+                statusElem.innerHTML = textStatus;
+                statusCommentElem.innerHTML = "Response: " + jqXHR.responseText;
+                if (textStatus!="success") {
+                    return
+                }
+                var b = $.evalJSON(jqXHR.responseText);
+                if (!b.success) {
+                    return
+                }
+            }
+        });
+
+		statusElem.innerHTML = 'Loading...';
+	}
+
+	function sendRequest(url, updateName) {
+		var req = getXmlHttp();
+		var statusElem = document.getElementById('status'); 
+		var statusCommElem = document.getElementById('status-comment'); 
+		
+		req.onreadystatechange = function() {  
+			if (req.readyState == 4) { 
+				statusElem.innerHTML = req.statusText;
+				if(req.status == 200) {
+					statusCommElem.innerHTML = ("Response: "+req.responseText);
+					if (updateName = true) {
+						setTimeout('getName()', 1000);
+					}
+				}
+				else {
+					statusCommElem.innerHTML = (req);
+				}
+			}
+		}
+
+		req.open('GET', url, true);  
+
+		req.send(null);
+
+		statusElem.innerHTML = 'Loading...';
+	}
+
+	function next() {
+		sendRequest('/webman/3rdparty/AudioStation/webUI/audio_player.cgi?action=next&target=usb', true);
+	}
+
+	function prev() {
+		sendRequest('/webman/3rdparty/AudioStation/webUI/audio_player.cgi?action=prev&target=usb', true);
+	}
+
+	function play() {
+		sendRequest('/webman/3rdparty/AudioStation/webUI/audio_player.cgi?action=play&target=usb', true);
+	}
+
+	function next() {
+		sendRequest('/webman/3rdparty/AudioStation/webUI/audio_player.cgi?action=next&target=usb', true);
+	}
+
+	function stop() {
+		sendRequest('/webman/3rdparty/AudioStation/webUI/audio_player.cgi?action=stop&target=usb', false);
+	}
+
+	function deleteAll() {
+		sendRequest('/webman/3rdparty/AudioStation/webUI/audio_playing.cgi?action=deleteall&target=usb', false);
+	}
+
+	function setVolume(vol) {
+		sendRequest('/webman/3rdparty/AudioStation/webUI/audio_player.cgi?action=setvolume&target=usb&volume=' + vol, false);
+	}
+
+	function playList(number) {
+		var playTarget = "musiclib_music_personal/playlist/" + number;
+		loadAndPlay(playTarget);
+	}
+
+	function random() {
+		var playTarget = "musiclib_random";
+		loadAndPlay(playTarget);
+	}
+
+	function fetchPlaylists() {
+		var ddl = document.getElementById('select-playlist');
+		var theOption;
+		var x;
+		var i;
+
+		for(i = 0; i < 999; i++) {
+			x = i + 1;
+			var theOption = new Option;
+			theOption.text = x;
+			theOption.value = x;
+			ddl.options[i] = theOption;
+		}
+	}
+
+	function loadAndPlay(playTarget) {
+		var statusElem = document.getElementById('status');
+		var statusCommentElem = document.getElementById('status-comment'); 
+		var f = {
+            action: "browse",
+            start: 0,
+            limit: 0,
+            allfiles: "yes",
+            library: "shared",
+            target: playTarget,
+            server: playTarget,
+            category_name: "",
+            album_name: "",
+            sort: "title",
+            dir: "ASC"
+        };
+        $.ajax({
+            url: "/webman/3rdparty/AudioStation/webUI/audio_browse.cgi",
+            type: "POST",
+            data: f,
+            dataType: "text",
+            success: function (data, textStatus, jqXHR) {
+                a = $.evalJSON(data);
+                this.playDisplacement = a.playDisplacement || 0;
+                if (!a.success) {
+            		statusElem.innerHTML = "Playlist Error"
+					statusCommElem.innerHTML = ("Response: "+data);
+                    return
+                }
+                if (a.items) {
+					var gCurrentSelectPlayer = "usb";
+			        var e = {
+			            items: $.toJSON(a.items),
+			            action: "replace",
+			            start: 0,
+			            limit: 50,
+			            target: gCurrentSelectPlayer,
+			            library: "shared",
+			            position: -1,
+			            play: true
+			        };
+			        $.ajax({
+			            url: "/webman/3rdparty/AudioStation/webUI/audio_playing.cgi",
+            			type: "POST",
+			            data: e,
+            			dataType: "text",
+            			success: function (data, textStatus, jqXHR) {
+			                statusElem.innerHTML = textStatus;
+			                statusCommentElem.innerHTML = "Response: " + data;
+            				var p = {
+								action: "jumpplay",
+								playid: 0,
+								target: gCurrentSelectPlayer
+					        };
+					        $.ajax({
+					            url: "/webman/3rdparty/AudioStation/webUI/audio_player.cgi",
+            					type: "POST",
+					            data: p,
+            					dataType: "text",
+            					success: function (data, textStatus, jqXHR) {
+									setTimeout('getName()', 1000);
+            					}
+					        });
+            			},
+			            error: function (jqXHR, textStatus, errorThrown) {
+			            	statusElem.innerHTML = "Playlist Error"
+							statusCommElem.innerHTML = ("Response: "+jqXHR.responseText);
+			                return
+			            }
+			        });
+
+					statusElem.innerHTML = 'Loading...';
+                }
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+            	statusElem.innerHTML = "Playlist Error"
+                return
+            }
+        });
+
+		statusElem.innerHTML = 'Loading...';
+	}
+
+	function getName() {
+		var gCurrentSelectPlayer = "usb";
+		var player = ($.isNumeric(gCurrentSelectPlayer)) ? gCurrentSelectPlayer : -1;
+        $.ajax({
+            url: "syno_audio_ajax_handler.cgi?player=" + player,
+            dataType: "text",
+            type: "GET",
+            complete: function (jqXHR, textStatus) {
+                var d;
+                if (textStatus!="success" || !jqXHR.responseText) {
+                    return
+                }
+                d = $.evalJSON(jqXHR.responseText);
+                if (!d) {
+                    return
+                }
+                var titleElem = document.getElementById('title'); 
+                var artistElem = document.getElementById('artist');
+                var moreInfoElem = document.getElementById('moreInfo');
+                var az = d.data;
+		        if ("" === az.Title) {
+		            aB = az.SongPath.lastIndexOf("/");
+		            titleElem.innerHTML = ((-1 === aB) ? az.SongPath : az.SongPath.substring(aB + 1))
+		        } else {
+		            titleElem.innerHTML = (az.Title)
+		        }
+		        artistElem.innerHTML = (az.Artist)
+		        var details = "";
+		        var contents;
+				for (var field in az) {
+					contents = az[field];
+					details += "</br>" + field + ": " + contents + "\n";
+				}
+                moreInfoElem.innerHTML = details;
+            }
+        });
+    }
+
+  </script>
+</head>
+
+<body class="single">
+  <div class="wrap">
+    <header>
+    	<div class="logo">
+    		<p>Web Remote</p>
+    	</div>   
+    </header>
+    <div class="content">
+    	<article>
+    		<section class="head">
+				<h3>Synology Audio Station Web Remote</h3>
+			</section>
+			<section>
+				<h2 class="underline">Controls</h2>
+				<form action="#" method="post" class="label-top">
+				    <div>
+						<h4>&bull;&nbsp;Login <a onclick ="javascript:ShowHide('login-div')" href="javascript:;" >Show/Hide</a></h4>
+
+						<div id="login-div" style="DISPLAY: none">
+							<label for="name">User Name:</label>
+							<input type="text" name="name" id="name" value="music" tabindex="1" />
+							<label for="password">Password:</label>
+							<input type="password" name="password" id="password" value="1234" tabindex="1" />
+							<p><a href="#status" onclick="login()">Submit</a></p>
+						</div>
+				    </div>
+
+					<div>
+						<h4>&bull;&nbsp;Status</h3>
+				    	<div id="status">
+				    	</div>
+				    	<div id="status-comment">
+				    	</div>
+					</div>
+
+					<div>
+						<h4>&bull;&nbsp;Track <a href="#status" onclick="getName()">Refresh</a></h3>
+				    	<div id="title">
+				    	</div>
+				    	<div id="artist">
+				    	</div>
+						<a onclick ="javascript:ShowHide('moreInfo')" href="javascript:;" >Show/Hide More Info</a>
+				    	<div id="moreInfo" style="DISPLAY: none">
+				    		---
+				    	</div>
+					</div>
+
+				    <div>
+				        <h4>&bull;&nbsp;Controls</h4>
+						<nav class="horizontal">
+							<ul>
+								<li><p><a href="#status" onclick="prev()">Prev</a></p></li>
+								<li><p><a href="#status" onclick="play()">Play/Pause</a></p></li>
+								<li><p><a href="#status" onclick="next()">Next</a></p></li>
+							</ul>
+							<ul>
+								<li><p><a href="#status" onclick="stop()">Stop</a></p></li>
+								<li><p><a href="#status" onclick="deleteAll()">Delete All</a></p></li>
+							</ul>
+							<ul>
+								<li><p><a href="#status" onclick="playList(1)">List 1</a></p></li>
+								<li><p><a href="#status" onclick="playList(2)">List 2</a></p></li>
+								<li><p><a href="#status" onclick="playList(3)">List 3</a></p></li>
+								<li><p><a href="#status" onclick="playList(4)">List 4</a></p></li>
+							</ul>
+							<ul>
+								<li><p><a href="#status" onclick="random()">Random100</a></p></li>
+							</ul>
+						</nav>
+				    </div>
+
+				    <div>
+						<h4>&bull;&nbsp;Playlists</h4>
+						<p><a onclick ="fetchPlaylists()" href="javascript:;" >Fetch</a></p>
+						<label for="select-playlist" class="inline">Select Playlist:</label>
+						<select name="select-playlist" id="select-playlist">
+							<option value="-1">---</option>
+						</select>
+				    </div>
+				
+					<div>
+						<h4>&bull;&nbsp;Volume</h4>
+						<label for="select-volume" class="inline">Select Volume:</label>
+						<select name="select-volume" id="select-volume" onchange="if (this.selectedIndex+1) setVolume(this.value)">
+							<option value="-1">---</option>
+							<option value="0">0</option>
+							<option value="10">10</option>
+							<option value="20">20</option>
+							<option value="30">30</option>
+							<option value="40">40</option>
+							<option value="50">50</option>
+							<option value="60">60</option>
+							<option value="70">70</option>
+							<option value="80">80</option>
+							<option value="90">90</option>
+							<option value="100">100</option>
+						</select>
+					</div>
+				</form>
+			</section>
+		</article>
+    </div>
+    <footer>
+    	<p>- &copy; Copyright 2012 Sergey Fedorov</p>
+    	<p>- Design by <a href="http://mobifreaks.com">Mobifreaks</a></p>
+    </footer>
+  </div>
+</body>
+</html>
