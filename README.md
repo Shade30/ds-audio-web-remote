@@ -4,7 +4,7 @@
 
 Copy into `/usr/syno/synoman/webman/3rdparty/WebRemote/`
 
-Browse `http://<HOST>/webman/3rdparty/WebRemote/music.html`
+Browse `http://<HOST>/webman/3rdparty/WebRemote/index.html`
 
 ## Features
 
